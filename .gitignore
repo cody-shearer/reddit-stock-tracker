@@ -124,3 +124,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 pystock_data.json
+test.py
+*.csv
