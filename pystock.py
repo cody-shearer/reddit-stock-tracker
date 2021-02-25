@@ -7,7 +7,7 @@ import re
 import datetime
 
 # Acessing the reddit api
-with open('/Users/cody/python/pystock_data.json', 'r') as read_file:
+with open('pystock_data.json', 'r') as read_file:
     settings = json.load(read_file)
 
 with open('tickers.json', 'r') as read_file:
