@@ -126,3 +126,5 @@ dmypy.json
 pystock_data.json
 test.py
 *.csv
+stonks.db
+.DS_Store

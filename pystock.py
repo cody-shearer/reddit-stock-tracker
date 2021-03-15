@@ -5,57 +5,86 @@ import json
 import ftplib
 import re
 import datetime
+import sqlite3
 
-# Acessing the reddit api
+class reddit_data:
+    def __init__(self):
+        self.post_data = []
+        self.post_stock_data = []
+        self.user_data = []
+        self.user_data_pos = {}
+        self.regex = re.compile('\\b(?:' + '|'.join(re.escape(str(x)) for x in tickers['tickers']) + ')\\b')
+
+    def add_post(self, post):
+        post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '')
+        found_tickers = self.regex.findall(post_text)
+        if 0 < len(found_tickers) < 200:
+            user_id = getattr(post, 'author_fullname', None)
+
+            self.post_data.append([
+                getattr(post, 'fullname', None), 
+                getattr(post, 'parent_id', None), 
+                getattr(post, 'author_fullname', None), 
+                getattr(post, 'created_utc', 0), 
+                getattr(subreddit, 'display_name', None),
+                getattr(post, 'score', 0), 
+                getattr(post, 'num_comments', 0), 
+                getattr(post, 'permalink', None)
+            ])
+
+            if user_id not in self.user_data_pos:
+                self.user_data_pos[user_id] = len(self.user_data)
+                user = getattr(post, 'author')
+                self.user_data.append([
+                    user_id,
+                    getattr(user, 'name', None),
+                    getattr(user, 'created_utc', 0),
+                    getattr(user, 'link_karma', 0),
+                    getattr(user, 'comment_karma', 0)
+                ])
+
+            added_tickers = []
+            for ticker in found_tickers:
+                if ticker not in added_tickers:
+                    added_tickers.append(ticker)
+                    self.post_stock_data.append([getattr(submission, 'fullname'), ticker])
+
 with open('pystock_data.json', 'r') as read_file:
     settings = json.load(read_file)
 
 with open('tickers.json', 'r') as read_file:
     tickers = json.load(read_file)
 
-regex = re.compile('\\b(?:' + '|'.join(re.escape(str(x)) for x in tickers['tickers']) + ')\\b')
-
-reddit = praw.Reddit(client_id=settings['client_id'],#my client id
-                     client_secret=settings['client_secret'],  #your client secret
+reddit = praw.Reddit(client_id=settings['client_id'],
+                     client_secret=settings['client_secret'],
                      user_agent=settings['user_agent'])
 
 subreddits = ['stocks', 'investing', 'wallstreetbets', 'smallstreetbets', 'options', 'dividends', 'daytrading']
 
-arr_data = [ticker for ticker in tickers['tickers']]
-s = pd.Series(arr_data)
-df_index = pd.Index(s)
-data = pd.DataFrame(index = s) 
-
-data['Total Mentions'] = 0 
-data['Score Weighted Mentions'] = 0 
-data['Unique Mentions'] = 0 
-data['Unique Users'] = '' 
+data = reddit_data()
 
 for s in subreddits:
-    subreddit = reddit.subreddit(s)   # Chosing the subreddit
-
-    for submission in subreddit.top(time_filter = 'day'):        
-        found_tickers = regex.findall(submission    .title + ' ' + submission.selftext )
-        if hasattr(submission.author, 'name'):
-            if 0 < len(found_tickers) < 200:
-                for ticker in found_tickers:
-                    data.at[ticker, 'Total Mentions'] += 1
-                    data.at[ticker, 'Score Weighted Mentions'] += submission.score
-                    if submission.author.name not in data.at[ticker, 'Unique Users']:
-                        data.at[ticker, 'Unique Users'] += submission.author.name + '|'
-                        data.at[ticker, 'Unique Mentions'] += 1
-
-        ##### Acessing comments on the post
+    subreddit = reddit.subreddit(s) 
+    for submission in subreddit.top(time_filter = 'day', limit = 1):
+        data.add_post(submission)
         submission.comments.replace_more()
         for comment in submission.comments.list():
-            found_tickers = regex.findall(comment.body)
-            if hasattr(comment.author, 'name'):
-                if 0 < len(found_tickers) < 200:
-                    for ticker in found_tickers:
-                        data.at[ticker, 'Total Mentions'] += 1
-                        data.at[ticker, 'Score Weighted Mentions'] += comment.score
-                        if comment.author.name not in data.at[ticker, 'Unique Users']:
-                            data.at[ticker, 'Unique Users'] += comment.author.name + '|'
-                            data.at[ticker, 'Unique Mentions'] += 1
-    
-data.to_csv('subreddit_stock_data' + str(datetime.date.today()) + '.csv')
+            data.add_post(comment)
+
+conn = sqlite3.connect('stonks.db')
+
+conn.executemany('insert or replace into users \
+                    (user_id, user_name, date_created, link_karma, comment_karma) \
+                    values (?, ?, ?, ?, ?)', data.user_data)
+
+conn.executemany('insert into posts \
+                    (post_id, parent_id, user_id, date_created, subreddit, score, num_comments, permalink) \
+                    values (?, ?, ?, ?, ?, ?, ?, ?)', data.post_data)
+
+conn.executemany('insert into post_symbols \
+                    (post_id, symbol) \
+                    values (?, ?)', data.post_stock_data)
+
+conn.commit()
+
+print('Done')
