@@ -2,10 +2,16 @@ import praw
 import pandas as pd
 import numpy as np
 import json
-import ftplib
 import re
 import datetime
 import sqlite3
+from ftplib import FTP
+
+class Reader:
+    def __init__(self):
+        self.data = ""
+    def __call__(self,s):
+        self.data += str(s)
 
 class reddit_data:
     def __init__(self):
@@ -13,7 +19,7 @@ class reddit_data:
         self.post_stock_data = []
         self.user_data = []
         self.user_data_pos = {}
-        self.regex = re.compile('\\b(?:' + '|'.join(re.escape(str(x)) for x in tickers['tickers']) + ')\\b')
+        self.regex = re.compile('\\b(?:' + '|'.join(re.escape(str(ticker)) for ticker in tickers) + ')\\b')
 
     def add_post(self, post):
         post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '')
@@ -52,8 +58,19 @@ class reddit_data:
 with open('pystock_data.json', 'r') as read_file:
     settings = json.load(read_file)
 
-with open('tickers.json', 'r') as read_file:
-    tickers = json.load(read_file)
+ftp = FTP('ftp.nasdaqtrader.com')
+ftp.login()
+r = Reader()
+ftp.retrbinary('RETR /SymbolDirectory/nasdaqtraded.txt', r)
+
+tickers = []
+
+excluded_tickers = ['TRUE', 'YOLO', 'Y', 'X', 'WORK', 'WELL', 'WANT', 'W', 'VERY', 'V', 'USD', 'USA', 'U', 'TWO', 'TRIP', 'TELL', 'T', 'STAY', 'SO', 'SNOW', 'SNAP', 'SIX', 'SEE', 'SAVE', 'RUN', 'RIDE', 'REAL', 'RE', 'R', 'PLUS', 'PICK', 'OUT', 'OR', 'OPEN', 'ONE', 'ON', 'OLD', 'O', 'NYC', 'NOW', 'NEXT', 'NEW', 'MUST', 'MOON', 'MARK', 'MAN', 'M', 'LOW', 'LOVE', 'LIVE', 'LIFE', 'LEAP', 'JUST', 'J', 'IT', 'IMO', 'ICE', 'HUGE', 'HOLD', 'HEAR', 'HE', 'HD', 'HAS', 'H', 'GOOD', 'GO', 'GDP', 'G', 'FOR', 'FAST', 'F', 'EVER', 'EOD', 'EDIT', 'EAT', 'E', 'DEEP', 'DD', 'D', 'CPI', 'CFO', 'CEO', 'CAT', 'CASH', 'CAN', 'C', 'BIG', 'BEST', 'BE', 'B', 'AT', 'ARE', 'ANY', 'AN', 'ALL', 'A', ]
+
+for stock in r.data.split('\\r\\n')[1:-2]:
+    ticker = stock.split('|')[1]
+    if ticker not in excluded_tickers:
+        tickers.append(ticker)
 
 reddit = praw.Reddit(client_id=settings['client_id'],
                      client_secret=settings['client_secret'],
@@ -64,7 +81,7 @@ subreddits = ['stocks', 'investing', 'wallstreetbets', 'smallstreetbets', 'optio
 data = reddit_data()
 
 for s in subreddits:
-    subreddit = reddit.subreddit(s) 
+    subreddit = reddit.subreddit(s)
     for submission in subreddit.top(time_filter = 'day', limit = 1):
         data.add_post(submission)
         submission.comments.replace_more()
