@@ -106,7 +106,7 @@ for sub in subreddits:
     timer = time.perf_counter()
     subreddit = reddit.subreddit(sub)
     data = reddit_data(sub, users)
-    for submission in subreddit.top(time_filter = 'day', limit=1):
+    for submission in subreddit.top(time_filter = 'day'):
         data.add_post(submission)
         submission.comments.replace_more()
         for comment in submission.comments.list():
