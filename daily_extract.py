@@ -1,13 +1,9 @@
-import praw
-import pandas as pd
-import numpy as np
 import json
+import praw
 import re
-import datetime
 import sqlite3
-from ftplib import FTP
-import reticker
 import time
+from ftplib import FTP
 
 class Reader:
     def __init__(self):
@@ -51,6 +47,7 @@ class reddit_data:
     def add_post(self, post):
         post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '') + ' ' + getattr(post, 'body', '')
         found_tickers = self.regex.findall(post_text)
+        found_tickers = list(dict.fromkeys(found_tickers))
         if 0 < len(found_tickers):
             user_id = getattr(post, 'author_fullname', None)
             post_id = getattr(post, 'fullname')
@@ -102,7 +99,7 @@ reddit = praw.Reddit(client_id=settings['client_id'],
                      client_secret=settings['client_secret'],
                      user_agent=settings['user_agent'])
 
-subreddits = ['stocks', 'investing', 'wallstreetbets', 'smallstreetbets', 'options', 'daytrading']
+subreddits = ['stocks', 'investing', 'smallstreetbets', 'daytrading', 'options', 'wallstreetbets']
 users = []
 
 for sub in subreddits:
@@ -114,6 +111,6 @@ for sub in subreddits:
         submission.comments.replace_more()
         for comment in submission.comments.list():
             data.add_post(comment)
-    #data.upload_data()
+    data.upload_data()
     users = data.unique_users
-    print('Data collection for ' + sub + ' finished in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
+    print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
