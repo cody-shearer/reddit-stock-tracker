@@ -128,3 +128,4 @@ test.py
 *.csv
 stonks.db
 .DS_Store
+config.json
