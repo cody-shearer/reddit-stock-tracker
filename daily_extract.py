@@ -6,6 +6,8 @@ import re
 import datetime
 import sqlite3
 from ftplib import FTP
+import reticker
+import time
 
 class Reader:
     def __init__(self):
@@ -14,94 +16,104 @@ class Reader:
         self.data += str(s)
 
 class reddit_data:
-    def __init__(self):
+    def __init__(self, sub, users):
         self.post_data = []
         self.post_stock_data = []
         self.user_data = []
-        self.user_data_pos = {}
-        self.regex = re.compile('\\b(?:' + '|'.join(re.escape(str(ticker)) for ticker in tickers) + ')\\b')
+        self.tickers = []
+        self.subreddit_name = sub
+        self.conn = sqlite3.connect('stonks.db')
+        self.get_tickers()
+        self.regex = re.compile('\\b(?:' + '|'.join(re.escape(str(ticker)) for ticker in self.tickers) + ')\\b')
+    
+        if users == []:
+            cur = self.conn.cursor()
+            cur.execute('select user_id from users')
+            self.unique_users = cur.fetchall()
+            self.unique_users = [user[0] for user in self.unique_users]
+        else:
+            self.unique_users = users
+
+    
+    def get_tickers(self):
+        ftp = FTP('ftp.nasdaqtrader.com')
+        ftp.login()
+        r = Reader()
+        ftp.retrbinary('RETR /SymbolDirectory/nasdaqtraded.txt', r)
+
+        excluded_tickers = ['TRUE', 'YOLO', 'Y', 'X', 'WORK', 'WELL', 'WANT', 'W', 'VERY', 'V', 'USD', 'USA', 'U', 'TWO', 'TRIP', 'TELL', 'T', 'STAY', 'SO', 'SNOW', 'SNAP', 'SIX', 'SEE', 'SAVE', 'RUN', 'RIDE', 'REAL', 'RE', 'R', 'PLUS', 'PICK', 'OUT', 'OR', 'OPEN', 'ONE', 'ON', 'OLD', 'O', 'NYC', 'NOW', 'NEXT', 'NEW', 'MUST', 'MOON', 'MARK', 'MAN', 'M', 'LOW', 'LOVE', 'LIVE', 'LIFE', 'LEAP', 'JUST', 'J', 'IT', 'IMO', 'ICE', 'HUGE', 'HOLD', 'HEAR', 'HE', 'HD', 'HAS', 'H', 'GOOD', 'GO', 'GDP', 'G', 'FOR', 'FAST', 'F', 'EVER', 'EOD', 'EDIT', 'EAT', 'E', 'DEEP', 'DD', 'D', 'CPI', 'CFO', 'CEO', 'CAT', 'CASH', 'CAN', 'C', 'BIG', 'BEST', 'BE', 'B', 'AT', 'ARE', 'ANY', 'AN', 'ALL', 'A', ]
+
+        for stock in r.data.split('\\r\\n')[1:-2]:
+            ticker = stock.split('|')[1]
+            if ticker not in excluded_tickers:
+                self.tickers.append(ticker)
 
     def add_post(self, post):
-        post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '')
+        post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '') + ' ' + getattr(post, 'body', '')
         found_tickers = self.regex.findall(post_text)
-        if 0 < len(found_tickers) < 200:
+        if 0 < len(found_tickers):
             user_id = getattr(post, 'author_fullname', None)
+            post_id = getattr(post, 'fullname')
 
-            self.post_data.append([
-                getattr(post, 'fullname', None), 
-                getattr(post, 'parent_id', None), 
-                getattr(post, 'author_fullname', None), 
-                getattr(post, 'created_utc', 0), 
-                getattr(subreddit, 'display_name', None),
-                getattr(post, 'score', 0), 
-                getattr(post, 'num_comments', 0), 
-                getattr(post, 'permalink', None)
-            ])
-
-            if user_id not in self.user_data_pos:
-                self.user_data_pos[user_id] = len(self.user_data)
-                user = getattr(post, 'author')
-                self.user_data.append([
-                    user_id,
-                    getattr(user, 'name', None),
-                    getattr(user, 'created_utc', 0),
-                    getattr(user, 'link_karma', 0),
-                    getattr(user, 'comment_karma', 0)
+            if user_id != None:
+                self.post_data.append([
+                    post_id, 
+                    getattr(post, 'parent_id', None), 
+                    getattr(post, 'author_fullname', None), 
+                    getattr(post, 'created_utc', None), 
+                    self.subreddit_name,
+                    getattr(post, 'score', 0), 
+                    getattr(post, 'num_comments', 0), 
+                    getattr(post, 'permalink', None)
                 ])
 
-            added_tickers = []
-            for ticker in found_tickers:
-                if ticker not in added_tickers:
-                    added_tickers.append(ticker)
-                    self.post_stock_data.append([getattr(submission, 'fullname'), ticker])
+                if user_id not in self.unique_users:
+                    self.unique_users.append(user_id)
+                    user = getattr(post, 'author')
+
+                    self.user_data.append([
+                        user_id,
+                        getattr(user, 'name', None),
+                        getattr(user, 'created_utc', 0)
+                    ])
+
+                for ticker in found_tickers:
+                   self.post_stock_data.append([post_id, ticker])
+    
+    def upload_data(self):
+        self.conn.executemany('insert into users \
+                            (user_id, user_name, date_created) \
+                            values (?, ?, ?)', self.user_data)
+
+        self.conn.executemany('insert into posts \
+                            (post_id, parent_id, user_id, date_created, subreddit, score, num_comments, permalink) \
+                            values (?, ?, ?, ?, ?, ?, ?, ?)', self.post_data)
+
+        self.conn.executemany('insert into post_symbols \
+                            (post_id, symbol) \
+                            values (?, ?)', self.post_stock_data)
+        
+        self.conn.commit()
 
 with open('pystock_data.json', 'r') as read_file:
     settings = json.load(read_file)
-
-ftp = FTP('ftp.nasdaqtrader.com')
-ftp.login()
-r = Reader()
-ftp.retrbinary('RETR /SymbolDirectory/nasdaqtraded.txt', r)
-
-tickers = []
-
-excluded_tickers = ['TRUE', 'YOLO', 'Y', 'X', 'WORK', 'WELL', 'WANT', 'W', 'VERY', 'V', 'USD', 'USA', 'U', 'TWO', 'TRIP', 'TELL', 'T', 'STAY', 'SO', 'SNOW', 'SNAP', 'SIX', 'SEE', 'SAVE', 'RUN', 'RIDE', 'REAL', 'RE', 'R', 'PLUS', 'PICK', 'OUT', 'OR', 'OPEN', 'ONE', 'ON', 'OLD', 'O', 'NYC', 'NOW', 'NEXT', 'NEW', 'MUST', 'MOON', 'MARK', 'MAN', 'M', 'LOW', 'LOVE', 'LIVE', 'LIFE', 'LEAP', 'JUST', 'J', 'IT', 'IMO', 'ICE', 'HUGE', 'HOLD', 'HEAR', 'HE', 'HD', 'HAS', 'H', 'GOOD', 'GO', 'GDP', 'G', 'FOR', 'FAST', 'F', 'EVER', 'EOD', 'EDIT', 'EAT', 'E', 'DEEP', 'DD', 'D', 'CPI', 'CFO', 'CEO', 'CAT', 'CASH', 'CAN', 'C', 'BIG', 'BEST', 'BE', 'B', 'AT', 'ARE', 'ANY', 'AN', 'ALL', 'A', ]
-
-for stock in r.data.split('\\r\\n')[1:-2]:
-    ticker = stock.split('|')[1]
-    if ticker not in excluded_tickers:
-        tickers.append(ticker)
 
 reddit = praw.Reddit(client_id=settings['client_id'],
                      client_secret=settings['client_secret'],
                      user_agent=settings['user_agent'])
 
-subreddits = ['stocks', 'investing', 'wallstreetbets', 'smallstreetbets', 'options', 'dividends', 'daytrading']
+subreddits = ['stocks', 'investing', 'wallstreetbets', 'smallstreetbets', 'options', 'daytrading']
+users = []
 
-data = reddit_data()
-
-for s in subreddits:
-    subreddit = reddit.subreddit(s)
-    for submission in subreddit.top(time_filter = 'day', limit = 1):
+for sub in subreddits:
+    timer = time.perf_counter()
+    subreddit = reddit.subreddit(sub)
+    data = reddit_data(sub, users)
+    for submission in subreddit.top(time_filter = 'day', limit=1):
         data.add_post(submission)
         submission.comments.replace_more()
         for comment in submission.comments.list():
             data.add_post(comment)
-
-conn = sqlite3.connect('stonks.db')
-
-conn.executemany('insert or replace into users \
-                    (user_id, user_name, date_created, link_karma, comment_karma) \
-                    values (?, ?, ?, ?, ?)', data.user_data)
-
-conn.executemany('insert into posts \
-                    (post_id, parent_id, user_id, date_created, subreddit, score, num_comments, permalink) \
-                    values (?, ?, ?, ?, ?, ?, ?, ?)', data.post_data)
-
-conn.executemany('insert into post_symbols \
-                    (post_id, symbol) \
-                    values (?, ?)', data.post_stock_data)
-
-conn.commit()
-
-print('Done')
+    #data.upload_data()
+    users = data.unique_users
+    print('Data collection for ' + sub + ' finished in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
