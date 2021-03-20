@@ -92,7 +92,7 @@ class reddit_data:
         
         self.conn.commit()
 
-with open('pystock_data.json', 'r') as read_file:
+with open('config.json', 'r') as read_file:
     settings = json.load(read_file)
 
 reddit = praw.Reddit(client_id=settings['client_id'],
