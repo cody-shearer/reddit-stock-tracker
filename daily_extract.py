@@ -82,11 +82,11 @@ class reddit_data:
                             (user_id, user_name, date_created) \
                             values (?, ?, ?)', self.user_data)
 
-        self.conn.executemany('insert into posts \
+        self.conn.executemany('insert or replace into posts \
                             (post_id, parent_id, user_id, date_created, subreddit, score, num_comments, permalink) \
                             values (?, ?, ?, ?, ?, ?, ?, ?)', self.post_data)
 
-        self.conn.executemany('insert into post_symbols \
+        self.conn.executemany('insert or ignore into post_symbols \
                             (post_id, symbol) \
                             values (?, ?)', self.post_stock_data)
         
