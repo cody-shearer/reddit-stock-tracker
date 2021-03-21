@@ -43,3 +43,7 @@ create table post_symbols (
             ON DELETE CASCADE
             ON UPDATE NO ACTION
     ) WITHOUT ROWID;
+
+create table log (
+    finish_time REAL PRIMARY KEY
+    );

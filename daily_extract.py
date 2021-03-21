@@ -3,6 +3,7 @@ import praw
 import re
 import sqlite3
 import time
+import datetime
 from ftplib import FTP
 
 class Reader:
@@ -114,3 +115,7 @@ for sub in subreddits:
     data.upload_data()
     users = data.unique_users
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
+
+conn = sqlite3.connect('stonks.db')
+conn.execute('insert into log (finish_time) values (?)', datetime.datetime.now()) 
+conn.commit()
