@@ -5,6 +5,8 @@ import sqlite3
 import time
 import datetime
 from ftplib import FTP
+import os
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 class Reader:
     def __init__(self):
@@ -19,7 +21,7 @@ class reddit_data:
         self.user_data = []
         self.tickers = []
         self.subreddit_name = sub
-        self.conn = sqlite3.connect('stonks.db')
+        self.conn = sqlite3.connect(dir_path + '/stonks.db')
         self.get_tickers()
         self.regex = re.compile('\\b(?:' + '|'.join(re.escape(str(ticker)) for ticker in self.tickers) + ')\\b')
     
@@ -93,7 +95,7 @@ class reddit_data:
         
         self.conn.commit()
 
-with open('config.json', 'r') as read_file:
+with open(dir_path + 'config.json', 'r') as read_file:
     settings = json.load(read_file)
 
 reddit = praw.Reddit(client_id=settings['client_id'],
@@ -116,6 +118,6 @@ for sub in subreddits:
     users = data.unique_users
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
-conn = sqlite3.connect('stonks.db')
+conn = sqlite3.connect(dir_path + 'stonks.db')
 conn.execute('insert into log (finish_time) values (?)', [datetime.datetime.now().strftime('%Y-%m-%d %H:%M')]) 
 conn.commit()
