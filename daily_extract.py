@@ -95,7 +95,7 @@ class reddit_data:
         
         self.conn.commit()
 
-with open(dir_path + 'config.json', 'r') as read_file:
+with open(dir_path + '/config.json', 'r') as read_file:
     settings = json.load(read_file)
 
 reddit = praw.Reddit(client_id=settings['client_id'],
@@ -118,6 +118,6 @@ for sub in subreddits:
     users = data.unique_users
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
-conn = sqlite3.connect(dir_path + 'stonks.db')
+conn = sqlite3.connect(dir_path + '/stonks.db')
 conn.execute('insert into log (finish_time) values (?)', [datetime.datetime.now().strftime('%Y-%m-%d %H:%M')]) 
 conn.commit()
