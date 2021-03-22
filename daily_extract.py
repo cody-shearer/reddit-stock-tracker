@@ -117,5 +117,5 @@ for sub in subreddits:
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
 conn = sqlite3.connect('stonks.db')
-conn.execute('insert into log (finish_time) values (?)', [datetime.datetime.now().strftime('%Y-%M-%d %H:%m')]) 
+conn.execute('insert into log (finish_time) values (?)', [datetime.datetime.now().strftime('%Y-%m-%d %H:%M')]) 
 conn.commit()
