@@ -107,7 +107,7 @@ for sub in subreddits:
     timer = time.perf_counter()
     subreddit = reddit.subreddit(sub)
     data = reddit_data(sub, users)
-    for submission in subreddit.top(time_filter = 'day'):
+    for submission in subreddit.top(time_filter = 'day',limit=1):
         data.add_post(submission)
         submission.comments.replace_more()
         for comment in submission.comments.list():
@@ -117,5 +117,5 @@ for sub in subreddits:
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
 conn = sqlite3.connect('stonks.db')
-conn.execute('insert into log (finish_time) values (?)', datetime.datetime.now()) 
+conn.execute('insert into log (finish_time) values (?)', str(datetime.datetime.now())) 
 conn.commit()

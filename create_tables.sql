@@ -45,5 +45,5 @@ create table post_symbols (
     ) WITHOUT ROWID;
 
 create table log (
-    finish_time REAL PRIMARY KEY
+    finish_time TEXT PRIMARY KEY
     );
