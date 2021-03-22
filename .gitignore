@@ -129,3 +129,4 @@ test.py
 stonks.db
 .DS_Store
 config.json
+stonks.db-journal
