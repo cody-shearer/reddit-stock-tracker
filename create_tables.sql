@@ -1,49 +1,49 @@
--- SQLite
-create table daily_report (
-    symbol TEXT,
-    date REAL,
-    open REAL,
-    close REAL,
-    high REAL,
-    low REAL,
-    mentions INTEGER,
-    sentiment_score REAL,
-    PRIMARY KEY (symbol, date)
-    ) WITHOUT ROWID ;
-
 create table users (
-    user_id TEXT PRIMARY KEY,
-    user_name TEXT,
-    date_created REAL,
-    link_karma INTEGER,
-    comment_karma INTEGER
-    ) WITHOUT ROWID ;
-
-create table posts (
-    post_id TEXT PRIMARY KEY,
-    parent_id TEXT,
-    user_id TEXT,
-    date_created REAL,
-    subreddit TEXT,
-    score REAL,
-    num_comments INTEGER,
-    permalink TEXT,
-    FOREIGN KEY (user_id)
-        REFERENCES users (user_id)
-            ON DELETE CASCADE
-            ON UPDATE NO ACTION
-    ) WITHOUT ROWID;
-
-create table post_symbols (
-    post_id TEXT,
-    symbol TEXT,
-    PRIMARY KEY(post_id, symbol),
-    FOREIGN KEY (post_id)
-        REFERENCES posts (post_id)
-            ON DELETE CASCADE
-            ON UPDATE NO ACTION
-    ) WITHOUT ROWID;
+    user_id nvarchar(16) primary key,
+    user_name nvarchar(20),
+    date_created date
+    );
 
 create table log (
-    finish_time TEXT PRIMARY KEY
+    run_id smallint auto_increment primary key,
+    start_time datetime,
+    end_time datetime
+    );
+
+create table error_log (
+    error_id smallint auto_increment primary key,
+    run_id smallint,
+    error text,
+    error_time datetime,
+    foreign key (run_id)
+        references log (run_id)
+            on delete cascade
+);
+
+create table posts (
+    run_id smallint,
+    post_id nvarchar(16),
+    parent_id nvarchar(16),
+    user_id nvarchar(16),
+    date_created datetime,
+    subreddit nvarchar(20),
+    score mediumint,
+    num_comments mediumint,
+    primary key (run_id, post_id),
+    foreign key (run_id)
+        references log (run_id)
+            on delete cascade,
+    foreign key (user_id)
+        references users (user_id)
+            on delete cascade
+    );
+
+create table post_symbols (
+    run_id smallint,
+    post_id nvarchar(16),
+    symbol nvarchar(10),
+    primary key(run_id, post_id, symbol),
+    foreign key (run_id, post_id)
+        references posts (run_id, post_id)
+            on delete cascade
     );
