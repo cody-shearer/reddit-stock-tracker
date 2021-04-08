@@ -88,7 +88,7 @@ class subreddit_data:
                     self.user_data.append([
                         user_id,
                         getattr(user, 'name', None),
-                        datetime.datetime.fromtimestamp(getattr(post, 'created_utc', None)).strftime('%Y-%m-%d %H:%M:%S'),
+                        datetime.datetime.fromtimestamp(getattr(user, 'created_utc', None)).strftime('%Y-%m-%d %H:%M:%S'),
                     ])
 
                 for ticker in found_tickers:
@@ -99,29 +99,33 @@ class subreddit_data:
                     ])
     
     def upload_data(self):
-        self.cursor.executemany('insert into users \
-                            (user_id, user_name, date_created) \
-                            values (%s, %s, %s)'
-                            , self.user_data
-                            )
+        try:
+            self.cursor.executemany('insert into users \
+                                (user_id, user_name, date_created) \
+                                values (%s, %s, %s)'
+                                , self.user_data
+                                )
 
-        self.cursor.execute('commit')
+            self.cursor.execute('commit')
 
-        self.cursor.executemany('insert into posts \
-                            (run_id, post_id, parent_id, user_id, date_created, subreddit, score, num_comments) \
-                            values (%s, %s, %s, %s, %s, %s, %s, %s)', 
-                            self.post_data
-                            )
+            self.cursor.executemany('insert into posts \
+                                (run_id, post_id, parent_id, user_id, date_created, subreddit, score, num_comments) \
+                                values (%s, %s, %s, %s, %s, %s, %s, %s)', 
+                                self.post_data
+                                )
 
-        self.cursor.execute('commit')
+            self.cursor.execute('commit')
 
-        self.cursor.executemany('insert into post_symbols \
-                            (run_id, post_id, symbol) \
-                            values (%s, %s, %s)', 
-                            self.post_stock_data
-                            )
+            self.cursor.executemany('insert into post_symbols \
+                                (run_id, post_id, symbol) \
+                                values (%s, %s, %s)', 
+                                self.post_stock_data
+                                )
 
-        self.cursor.execute('commit')
+            self.cursor.execute('commit')
+        except Exception as e: 
+            self.cursor.callproc('log_error', [run_id, e])
+            raise
 
 with open(dir_path + '/config.json', 'r') as read_file:
     settings = json.load(read_file)
@@ -159,4 +163,5 @@ for sub in subreddits:
     users = data.unique_users
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
+cursor.callproc('process_daily_data')
 cursor.callproc('log_finish', [run_id])
