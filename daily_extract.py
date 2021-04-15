@@ -163,5 +163,5 @@ for sub in subreddits:
     users = data.unique_users
     print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
-cursor.callproc('process_daily_data')
+cursor.callproc('process_daily_data', [run_id])
 cursor.callproc('log_finish', [run_id])
