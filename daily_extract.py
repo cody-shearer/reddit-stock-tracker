@@ -1,7 +1,6 @@
 import json
 import praw
 import re
-import sqlite3
 import time
 import datetime
 import mysql.connector
