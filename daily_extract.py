@@ -6,6 +6,8 @@ import datetime
 import mysql.connector
 from ftplib import FTP
 import os
+import logging
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 class Reader:
@@ -149,18 +151,29 @@ reddit = praw.Reddit(client_id=settings['client_id'],
 subreddits = ['stocks', 'investing', 'smallstreetbets', 'daytrading', 'options', 'wallstreetbets']
 users = []
 
-for sub in subreddits:
-    timer = time.perf_counter()
-    subreddit = reddit.subreddit(sub)
-    data = subreddit_data(sub, users, run_id, cursor)
-    for submission in subreddit.top(time_filter = 'day'):
-        data.add_post(submission)
-        submission.comments.replace_more(limit=500)
-        for comment in submission.comments.list():
-            data.add_post(comment)
-    data.upload_data()
-    users = data.unique_users
-    print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
+try:
+    for sub in subreddits:
+        timer = time.perf_counter()
+        subreddit = reddit.subreddit(sub)
+        data = subreddit_data(sub, users, run_id, cursor)
+        for submission in subreddit.top(time_filter = 'day'):
+            data.add_post(submission)
+            submission.comments.replace_more(limit=500)
+            for comment in submission.comments.list():
+                data.add_post(comment)
+        data.upload_data()
+        users = data.unique_users
+        print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
-cursor.callproc('process_daily_data', [run_id])
-cursor.callproc('log_finish', [run_id])
+    cursor.callproc('process_daily_data', [run_id])
+    cursor.callproc('log_finish', [run_id])
+except Exception as Argument:
+  
+     # creating/opening a file
+     f = open(str(run_id) + '.txt', 'a')
+  
+     # writing in the file
+     f.write(str(Argument))
+       
+     # closing the file
+     f.close() 
