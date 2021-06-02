@@ -1,12 +1,11 @@
 import json
 import praw
 import re
-import time
 import datetime
 import mysql.connector
 from ftplib import FTP
 import os
-import logging
+import traceback
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -76,7 +75,7 @@ class subreddit_data:
                     post_id,
                     parent_id,
                     getattr(post, 'author_fullname', None),
-                    datetime.datetime.fromtimestamp(getattr(post, 'created_utc', None)).strftime('%Y-%m-%d %H:%M:%S'),
+                    datetime.datetime.fromtimestamp(getattr(post, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
                     self.subreddit_name,
                     int(getattr(post, 'score', 0)),
                     num_comments
@@ -89,7 +88,7 @@ class subreddit_data:
                     self.user_data.append([
                         user_id,
                         getattr(user, 'name', None),
-                        datetime.datetime.fromtimestamp(getattr(user, 'created_utc', None)).strftime('%Y-%m-%d %H:%M:%S'),
+                        datetime.datetime.fromtimestamp(getattr(user, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
                     ])
 
                 for ticker in found_tickers:
@@ -153,7 +152,6 @@ users = []
 
 try:
     for sub in subreddits:
-        timer = time.perf_counter()
         subreddit = reddit.subreddit(sub)
         data = subreddit_data(sub, users, run_id, cursor)
         for submission in subreddit.top(time_filter = 'day'):
@@ -163,17 +161,16 @@ try:
                 data.add_post(comment)
         data.upload_data()
         users = data.unique_users
-        print('Finished data collection for r/' + sub + ' in ' + str(round(time.perf_counter() - timer)) + ' seconds.')
 
     cursor.callproc('process_daily_data', [run_id])
     cursor.callproc('log_finish', [run_id])
-except Exception as Argument:
+except:
   
      # creating/opening a file
      f = open(str(run_id) + '.txt', 'a')
   
      # writing in the file
-     f.write(str(Argument))
+     f.write(str(traceback.format_exc()))
        
      # closing the file
      f.close() 
