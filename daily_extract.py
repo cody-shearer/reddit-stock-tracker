@@ -55,49 +55,53 @@ class subreddit_data:
                     self.tickers.append(ticker)
 
     def add_post(self, post):
-        post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '') + ' ' + getattr(post, 'body', '')
-        found_tickers = self.regex.findall(post_text)
-        found_tickers = list(dict.fromkeys(found_tickers))
-        if 0 < len(found_tickers):
-            user_id = getattr(post, 'author_fullname', None)
-            post_id = getattr(post, 'fullname')
+        try:
+            post_text = getattr(post, 'title', '') +  ' ' + getattr(post, 'selftext', '') + ' ' + getattr(post, 'body', '')
+            found_tickers = self.regex.findall(post_text)
+            found_tickers = list(dict.fromkeys(found_tickers))
+            if 0 < len(found_tickers):
+                user_id = getattr(post, 'author_fullname', None)
+                post_id = getattr(post, 'fullname')
 
-            if user_id != None:
-                parent_id = getattr(post, 'parent_id', None)
+                if user_id != None:
+                    parent_id = getattr(post, 'parent_id', None)
 
-                if parent_id is not None: #only comments have a parent_id
-                    num_comments = len(getattr(getattr(post, 'replies', None), '_comments', 0))
-                else:
-                    num_comments = len(getattr(getattr(post, 'comments', None), '_comments', 0))
+                    if parent_id is not None: #only comments have a parent_id
+                        num_comments = len(getattr(getattr(post, 'replies', None), '_comments', 0))
+                    else:
+                        num_comments = len(getattr(getattr(post, 'comments', None), '_comments', 0))
 
-                self.post_data.append([
-                    self.run_id,
-                    post_id,
-                    parent_id,
-                    getattr(post, 'author_fullname', None),
-                    datetime.datetime.fromtimestamp(getattr(post, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
-                    self.subreddit_name,
-                    int(getattr(post, 'score', 0)),
-                    num_comments
-                    ])
-
-                if user_id not in self.unique_users:
-                    self.unique_users.append(user_id)
-                    user = getattr(post, 'author')
-
-                    self.user_data.append([
-                        user_id,
-                        getattr(user, 'name', None),
-                        datetime.datetime.fromtimestamp(getattr(user, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
-                    ])
-
-                for ticker in found_tickers:
-                   self.post_stock_data.append([
+                    self.post_data.append([
                         self.run_id,
-                        post_id, 
-                        ticker
-                    ])
-    
+                        post_id,
+                        parent_id,
+                        getattr(post, 'author_fullname', None),
+                        datetime.datetime.fromtimestamp(getattr(post, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
+                        self.subreddit_name,
+                        int(getattr(post, 'score', 0)),
+                        num_comments
+                        ])
+
+                    if user_id not in self.unique_users:
+                        self.unique_users.append(user_id)
+                        user = getattr(post, 'author')
+
+                        self.user_data.append([
+                            user_id,
+                            getattr(user, 'name', None),
+                            datetime.datetime.fromtimestamp(getattr(user, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
+                        ])
+
+                    for ticker in found_tickers:
+                        self.post_stock_data.append([
+                            self.run_id,
+                            post_id, 
+                            ticker
+                        ])
+        except Exception as e:
+            self.cursor.callproc('log_error', [run_id, str(traceback.format_exc())])
+
+        
     def upload_data(self):
         try:
             self.cursor.executemany('insert into users \
@@ -124,7 +128,7 @@ class subreddit_data:
 
             self.cursor.execute('commit')
         except Exception as e: 
-            self.cursor.callproc('log_error', [run_id, e])
+            self.cursor.callproc('log_error', [run_id, str(traceback.format_exc())])
             raise
 
 with open(dir_path + '/config.json', 'r') as read_file:
@@ -156,7 +160,7 @@ try:
         data = subreddit_data(sub, users, run_id, cursor)
         for submission in subreddit.top(time_filter = 'day'):
             data.add_post(submission)
-            submission.comments.replace_more(limit=500)
+            submission.comments.replace_more(limit=250)
             for comment in submission.comments.list():
                 data.add_post(comment)
         data.upload_data()
