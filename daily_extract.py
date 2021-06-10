@@ -65,6 +65,7 @@ class subreddit_data:
 
                 if user_id != None:
                     parent_id = getattr(post, 'parent_id', None)
+                    created_utc = datetime.datetime.fromtimestamp(getattr(post, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S')
 
                     if parent_id is not None: #only comments have a parent_id
                         num_comments = len(getattr(getattr(post, 'replies', None), '_comments', 0))
@@ -75,8 +76,8 @@ class subreddit_data:
                         self.run_id,
                         post_id,
                         parent_id,
-                        getattr(post, 'author_fullname', None),
-                        datetime.datetime.fromtimestamp(getattr(post, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
+                        user_id,
+                        created_utc,
                         self.subreddit_name,
                         int(getattr(post, 'score', 0)),
                         num_comments
@@ -89,7 +90,7 @@ class subreddit_data:
                         self.user_data.append([
                             user_id,
                             getattr(user, 'name', None),
-                            datetime.datetime.fromtimestamp(getattr(user, 'created_utc', 0)).strftime('%Y-%m-%d %H:%M:%S'),
+                            created_utc,
                         ])
 
                     for ticker in found_tickers:
@@ -99,7 +100,7 @@ class subreddit_data:
                             ticker
                         ])
         except Exception as e:
-            self.cursor.callproc('log_error', [run_id, str(traceback.format_exc())])
+            self.cursor.callproc('log_error', [run_id, 'Error uploading post: ' + str(post_id)])
 
         
     def upload_data(self):
@@ -129,7 +130,6 @@ class subreddit_data:
             self.cursor.execute('commit')
         except Exception as e: 
             self.cursor.callproc('log_error', [run_id, str(traceback.format_exc())])
-            raise
 
 with open(dir_path + '/config.json', 'r') as read_file:
     settings = json.load(read_file)
@@ -160,7 +160,7 @@ try:
         data = subreddit_data(sub, users, run_id, cursor)
         for submission in subreddit.top(time_filter = 'day'):
             data.add_post(submission)
-            submission.comments.replace_more(limit=250)
+            submission.comments.replace_more(limit=100)
             for comment in submission.comments.list():
                 data.add_post(comment)
         data.upload_data()
